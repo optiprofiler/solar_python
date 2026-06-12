@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "name": "bbopt/solar",
+    "url": "https://github.com/bbopt/solar.git",
+    "branch": "master",
+    "commit": "dda8fd7f98d4392aa07b3e3056888624a00712a0",
+    "commit_date": "2026-03-26T14:39:38Z",
+    "commit_subject": "Move old results and add CT results",
+    "license": "LGPL-2.1"
+  },
+  "synced_at": "2026-06-12T00:00:00+00:00",
+  "policy": {
+    "strategy": "track-upstream-latest-with-recorded-commit",
+    "vendor_source": false,
+    "commit_upstream_checkout": false
+  }
+}
+
