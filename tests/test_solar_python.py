@@ -1,5 +1,7 @@
 from pathlib import Path
 import math
+import multiprocessing as mp
+import shutil
 import sys
 import unittest
 import numpy as np
@@ -9,6 +11,11 @@ sys.path.insert(0, str(op_root / "optiprofiler" / "python"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from solar_python import solar_load, solar_python_load, solar_python_select, solar_select
+
+
+def _parallel_load_and_eval(problem_name):
+    problem = solar_python_load(problem_name)
+    return problem.name, problem.n, math.isfinite(problem.fun(problem.x0))
 
 
 class SolarPythonTests(unittest.TestCase):
@@ -37,6 +44,28 @@ class SolarPythonTests(unittest.TestCase):
         x[5] = 250.5
         self.assertTrue(math.isfinite(problem.fun(x)))
         self.assertFalse(any(math.isnan(float(value)) for value in problem.cub(x)))
+
+    def test_parallel_cold_build_is_locked(self):
+        runtime_dir = Path(__file__).resolve().parents[1] / "runtime" / "solar"
+        shutil.rmtree(runtime_dir / "bin", ignore_errors=True)
+        for object_file in (runtime_dir / "src").glob("*.o"):
+            object_file.unlink()
+        lock_file = runtime_dir / ".build.lock"
+        if lock_file.exists():
+            lock_file.unlink()
+
+        problem_names = [
+            "SOLAR1_MAXNRG_H1",
+            "SOLAR2_MINSURF_H1",
+            "SOLAR3_MINCOST_C1",
+            "SOLAR4_MINCOST_C2",
+        ]
+        with mp.get_context("spawn").Pool(4) as pool:
+            results = pool.map(_parallel_load_and_eval, problem_names)
+
+        self.assertTrue((runtime_dir / "bin" / "solar").exists())
+        self.assertEqual([name for name, _, _ in results], problem_names)
+        self.assertTrue(all(is_finite for _, _, is_finite in results))
 
 
 if __name__ == "__main__":

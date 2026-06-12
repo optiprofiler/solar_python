@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import csv
+import fcntl
 import inspect
 import json
 import math
@@ -193,10 +195,46 @@ def _ensure_executable():
     if executable.exists():
         return executable
 
-    subprocess.run(["make", "-C", str(RUNTIME_DIR / "src")], check=True)
+    with _build_lock():
+        if executable.exists():
+            return executable
+        executable.parent.mkdir(parents=True, exist_ok=True)
+        completed = subprocess.run(
+            ["make", "-C", str(RUNTIME_DIR / "src")],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if completed.returncode != 0:
+            raise SolarExecutionError(
+                "Failed to build SOLAR executable: "
+                f"{completed.stdout}{completed.stderr}"
+            )
     if not executable.exists():
         raise SolarExecutionError(f"SOLAR executable was not built: {executable}")
     return executable
+
+
+@contextmanager
+def _build_lock(timeout_sec=600.0):
+    lock_path = RUNTIME_DIR / ".build.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + timeout_sec
+    with lock_path.open("w", encoding="utf-8") as lock_file:
+        while True:
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError as exc:
+                if time.monotonic() >= deadline:
+                    raise SolarExecutionError(
+                        "Timed out waiting for another process to build SOLAR"
+                    ) from exc
+                time.sleep(0.1)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _run_solar(executable, problem_id, x, n_objectives, n_constraints, timeout_sec=300.0):

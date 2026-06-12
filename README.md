@@ -17,6 +17,9 @@ make -C runtime/solar/src
 ```
 
 The binary is generated at `runtime/solar/bin/solar` and is ignored by git.
+The Python wrapper also builds this binary on first use if it is missing. First
+build is protected by a local file lock, so parallel OptiProfiler workers do
+not try to compile and link the same runtime at the same time.
 
 ## Usage
 
