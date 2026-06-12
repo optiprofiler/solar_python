@@ -41,6 +41,22 @@ SOLAR 8 and 9 are multiobjective and are not returned by the first scalar
 OptiProfiler selector. SOLAR 11 is disabled for now because upstream SOLAR
 v1.0.8 returns an empty output at the documented initial point.
 
+## Runtime Expectations
+
+SOLAR problems call an external C++ solar-plant simulator. Some instances are
+substantially more expensive than ordinary algebraic test problems: a single
+objective or constraint evaluation can keep one CPU core busy for many seconds
+or longer. In local OptiProfiler tests, the slowest scalar instances have been
+`SOLAR3_MINCOST_C1`, `SOLAR4_MINCOST_C2`, and especially
+`SOLAR5_MAXCOMP_HTF1`.
+
+Solver choice can multiply this cost. Finite-difference methods and
+model-based DFO solvers may call the SOLAR executable many times per iteration
+or poll step, so a run may appear quiet while the simulator is still using CPU.
+For smoke tests, start with `SOLAR6_MINCOST_TS` or
+`SOLAR10_MINCOST_UNCONSTRAINED`, use `n_jobs=1`, and keep
+`max_eval_factor` small.
+
 ## Integer Variables
 
 Several scalar SOLAR instances include integer or categorical variables. Before
