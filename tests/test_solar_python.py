@@ -2,6 +2,7 @@ from pathlib import Path
 import math
 import sys
 import unittest
+import numpy as np
 
 op_root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(op_root / "optiprofiler" / "python"))
@@ -29,6 +30,13 @@ class SolarPythonTests(unittest.TestCase):
         self.assertEqual(cubx.size, 5)
         self.assertFalse(any(math.isnan(float(value)) for value in cubx))
         self.assertEqual(solar_load("SOLAR10_MINCOST_UNCONSTRAINED").n, 5)
+
+    def test_integer_variables_are_projected_before_solar_call(self):
+        problem = solar_python_load("SOLAR1_MAXNRG_H1")
+        x = np.asarray(problem.x0, dtype=float).copy()
+        x[5] = 250.5
+        self.assertTrue(math.isfinite(problem.fun(x)))
+        self.assertFalse(any(math.isnan(float(value)) for value in problem.cub(x)))
 
 
 if __name__ == "__main__":

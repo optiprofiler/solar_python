@@ -107,17 +107,17 @@ class _SolarProblemState:
         self._last_eval = None
 
     def _eval(self, x):
-        x = np.asarray(x, dtype=float).reshape(-1)
-        if self._last_x is not None and np.array_equal(x, self._last_x):
+        solar_x = _prepare_solar_input(self.metadata, x)
+        if self._last_x is not None and np.array_equal(solar_x, self._last_x):
             return self._last_eval
         result = _run_solar(
             self.executable,
             self.metadata["pb_id"],
-            x,
+            solar_x,
             self.metadata["m_objectives"],
             self.metadata["m_constraints"],
         )
-        self._last_x = x.copy()
+        self._last_x = solar_x.copy()
         self._last_eval = result
         return result
 
@@ -162,6 +162,29 @@ def _row(problem):
 def _bounds(values, *, lower):
     fallback = -np.inf if lower else np.inf
     return np.asarray([fallback if value is None else value for value in values], dtype=float)
+
+
+def _prepare_solar_input(metadata, x):
+    x = np.asarray(x, dtype=float).reshape(-1).copy()
+    if x.size != int(metadata["n"]):
+        raise SolarExecutionError(
+            f"SOLAR input has dimension {x.size}, expected {metadata['n']}"
+        )
+    input_type = metadata.get("input_type", [])
+    lower_bounds = metadata.get("xl", [None] * x.size)
+    upper_bounds = metadata.get("xu", [None] * x.size)
+    for i, variable_type in enumerate(input_type):
+        if variable_type != "I" or not np.isfinite(x[i]):
+            continue
+        value = math.floor(float(x[i]) + 0.5)
+        lower = lower_bounds[i]
+        upper = upper_bounds[i]
+        if lower is not None and math.isfinite(float(lower)):
+            value = max(value, math.ceil(float(lower)))
+        if upper is not None and math.isfinite(float(upper)):
+            value = min(value, math.floor(float(upper)))
+        x[i] = value
+    return x
 
 
 def _ensure_executable():
