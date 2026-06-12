@@ -27,6 +27,32 @@ class SolarPythonTests(unittest.TestCase):
         self.assertNotIn("SOLAR11_MINCOST_CH", names)
         self.assertEqual(names, solar_select({"ptype": "n", "maxdim": 10}))
 
+    def test_select_enabled_scalar_problem_set(self):
+        names = solar_python_select(
+            {
+                "ptype": "bn",
+                "maxdim": 100,
+                "maxb": 100,
+                "maxnlcon": 100,
+                "maxcon": 100,
+            }
+        )
+        self.assertEqual(
+            names,
+            [
+                "SOLAR1_MAXNRG_H1",
+                "SOLAR2_MINSURF_H1",
+                "SOLAR3_MINCOST_C1",
+                "SOLAR4_MINCOST_C2",
+                "SOLAR5_MAXCOMP_HTF1",
+                "SOLAR6_MINCOST_TS",
+                "SOLAR7_MAXEFF_RE",
+                "SOLAR10_MINCOST_UNCONSTRAINED",
+            ],
+        )
+        self.assertNotIn("SOLAR8_MAXHF_MINCOST", names)
+        self.assertNotIn("SOLAR9_MAXNRG_MINPAR", names)
+
     def test_load_and_evaluate_fast_problem(self):
         problem = solar_python_load("SOLAR1_MAXNRG_H1")
         self.assertEqual(problem.name, "SOLAR1_MAXNRG_H1")
@@ -75,9 +101,9 @@ class SolarPythonTests(unittest.TestCase):
 
         problem_names = [
             "SOLAR1_MAXNRG_H1",
-            "SOLAR2_MINSURF_H1",
-            "SOLAR3_MINCOST_C1",
-            "SOLAR4_MINCOST_C2",
+            "SOLAR6_MINCOST_TS",
+            "SOLAR7_MAXEFF_RE",
+            "SOLAR10_MINCOST_UNCONSTRAINED",
         ]
         with mp.get_context("spawn").Pool(4) as pool:
             results = pool.map(_parallel_load_and_eval, problem_names)

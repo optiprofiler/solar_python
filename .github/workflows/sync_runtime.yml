@@ -1,0 +1,74 @@
+name: Sync SOLAR Runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      adapter_ref:
+        description: "solar_adapter branch, tag, or commit"
+        required: false
+        default: "main"
+  repository_dispatch:
+    types: [solar-runtime-updated]
+
+permissions:
+  contents: write
+
+jobs:
+  sync-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout solar_adapter
+        uses: actions/checkout@v4
+        with:
+          repository: optiprofiler/solar_adapter
+          path: solar_adapter
+          ref: ${{ github.event.client_payload.adapter_ref || github.event.inputs.adapter_ref || 'main' }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Generate slim runtime from adapter
+        run: |
+          bash solar_adapter/scripts/sync_solar.sh
+          bash solar_adapter/scripts/export_runtime.sh solar_adapter/build/solar-runtime
+
+      - name: Copy runtime into Python wrapper
+        run: |
+          rsync -a --delete \
+            --exclude='bin/solar' \
+            --exclude='src/*.o' \
+            solar_adapter/build/solar-runtime/ runtime/solar/
+          rm -f runtime/solar/bin/solar runtime/solar/src/*.o runtime/solar/.build.lock
+
+      - name: Regenerate probinfo
+        run: |
+          python scripts/collect_info.py
+
+      - name: Run tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install git+https://github.com/optiprofiler/optiprofiler.git
+          python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Commit runtime update
+        run: |
+          rm -f runtime/solar/bin/solar runtime/solar/src/*.o runtime/solar/.build.lock
+          git add runtime/solar
+          if git diff --staged --quiet; then
+            echo "No runtime changes detected."
+          else
+            git commit -m "Sync SOLAR runtime from adapter"
+            git push
+          fi
