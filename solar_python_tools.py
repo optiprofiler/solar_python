@@ -259,14 +259,23 @@ def _run_solar(executable, problem_id, x, n_objectives, n_constraints, timeout_s
         )
         elapsed = time.perf_counter() - started
 
-    if completed.returncode != 0:
-        raise SolarExecutionError(
-            f"SOLAR failed with return code {completed.returncode}: "
-            f"{completed.stderr.strip()}"
-        )
-    values = _parse_numeric_output(completed.stdout)
     expected = n_objectives + n_constraints
+    try:
+        values = _parse_numeric_output(completed.stdout)
+    except SolarExecutionError as exc:
+        if completed.returncode != 0:
+            raise SolarExecutionError(
+                f"SOLAR failed with return code {completed.returncode}: "
+                f"{completed.stderr.strip()}"
+            ) from exc
+        raise
     if len(values) != expected:
+        if completed.returncode != 0:
+            raise SolarExecutionError(
+                f"SOLAR failed with return code {completed.returncode} and "
+                f"returned {len(values)} numeric values, expected {expected}: "
+                f"{completed.stderr.strip()}"
+            )
         raise SolarExecutionError(
             f"SOLAR returned {len(values)} numeric values, expected {expected}"
         )

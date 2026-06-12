@@ -45,6 +45,25 @@ class SolarPythonTests(unittest.TestCase):
         self.assertTrue(math.isfinite(problem.fun(x)))
         self.assertFalse(any(math.isnan(float(value)) for value in problem.cub(x)))
 
+    def test_solar_penalty_output_with_nonzero_return_code_is_usable(self):
+        problem = solar_python_load("SOLAR1_MAXNRG_H1")
+        x = np.array([
+            11.5151099,
+            11.7130879,
+            152.111131,
+            10.8030550,
+            10.8979273,
+            250.610792,
+            46.2980097,
+            0.0,
+            6.24313876,
+        ])
+        self.assertEqual(problem.fun(x), 1e20)
+        cubx = problem.cub(x)
+        self.assertEqual(cubx.size, 5)
+        self.assertFalse(any(math.isnan(float(value)) for value in cubx))
+        self.assertTrue(np.any(cubx == 1e20))
+
     def test_parallel_cold_build_is_locked(self):
         runtime_dir = Path(__file__).resolve().parents[1] / "runtime" / "solar"
         shutil.rmtree(runtime_dir / "bin", ignore_errors=True)
