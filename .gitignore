@@ -1,0 +1,5 @@
+runtime/solar/bin/solar
+runtime/solar/src/*.o
+__pycache__/
+.pytest_cache/
+.DS_Store

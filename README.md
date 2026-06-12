@@ -21,12 +21,18 @@ The binary is generated at `runtime/solar/bin/solar` and is ignored by git.
 ## Usage
 
 ```python
-from solar_python import solar_load, solar_select
+from solar_python import solar_python_load, solar_python_select
 
-names = solar_select({"ptype": "n", "maxdim": 20})
-problem = solar_load(names[0])
+names = solar_python_select({"ptype": "n", "maxdim": 20})
+problem = solar_python_load(names[0])
 print(problem.fun(problem.x0))
 ```
+
+For convenience, `solar_load`, `solar_select`, and `solar_collect_info` are also
+available as aliases. The canonical OptiProfiler tools module is
+`solar_python_tools.py`, with `solar_python_load` and `solar_python_select`, so
+the repository can be used as `plib="solar_python"` without relying on custom
+library filename inference.
 
 SOLAR 8 and 9 are multiobjective and are not returned by the first scalar
 OptiProfiler selector. SOLAR 11 is disabled for now because upstream SOLAR
