@@ -9,3 +9,6 @@ license/readme files, OptiProfiler metadata, and the upstream manifest.
 Language-specific wrapper repositories may copy this runtime source without
 committing `bin/solar` or `src/*.o`; those generated files should be rebuilt by
 CI, the server, or the user's local machine.
+
+This runtime source includes the adapter's Linux build compatibility patch for
+one upstream `isnan` call, rewritten as `std::isnan`.
