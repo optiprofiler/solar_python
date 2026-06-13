@@ -44,5 +44,6 @@ jobs:
         if: always()
         run: |
           rm -f runtime/solar/bin/solar runtime/solar/src/*.o runtime/solar/.build.lock
+          rm -rf optiprofiler
           git status --short
           test -z "$(git status --short)"
