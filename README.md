@@ -39,7 +39,7 @@ commits only source, metadata, license, and provenance files.
 ## Usage
 
 ```python
-from solar import solar_load, solar_select
+from solar_tools import solar_load, solar_select
 
 names = solar_select({"ptype": "n", "maxdim": 20})
 problem = solar_load(names[0])
@@ -47,10 +47,8 @@ print(problem.fun(problem.x0))
 ```
 
 In OptiProfiler, use this adapter as the problem library `solar`, for example
-`benchmark(solvers, plibs=["solar"], ...)`. The repository still keeps
-`solar_python_*` compatibility entry points internally because the GitHub source
-repository is language-specific, but the public problem-library name is
-`solar`.
+`benchmark(solvers, plibs=["solar"], ...)`. The GitHub source repository name is
+language-specific, but the public problem-library name is `solar`.
 
 SOLAR 8 and 9 are multiobjective and are not returned by the first scalar
 OptiProfiler selector. SOLAR 11 is disabled for now because upstream SOLAR
