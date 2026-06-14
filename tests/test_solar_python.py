@@ -10,7 +10,13 @@ op_root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(op_root / "optiprofiler" / "python"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from solar_python import solar_load, solar_python_load, solar_python_select, solar_select
+from solar_python import (
+    solar_collect_info,
+    solar_load,
+    solar_python_load,
+    solar_python_select,
+    solar_select,
+)
 
 
 def _parallel_load_and_eval(problem_name):
@@ -52,6 +58,35 @@ class SolarPythonTests(unittest.TestCase):
         )
         self.assertNotIn("SOLAR8_MAXHF_MINCOST", names)
         self.assertNotIn("SOLAR9_MAXNRG_MINPAR", names)
+
+    def test_collect_info_matches_loaded_problem_contract(self):
+        rows = solar_collect_info()
+        names = [row["name"] for row in rows]
+        self.assertEqual(
+            names,
+            [
+                "SOLAR1_MAXNRG_H1",
+                "SOLAR2_MINSURF_H1",
+                "SOLAR3_MINCOST_C1",
+                "SOLAR4_MINCOST_C2",
+                "SOLAR5_MAXCOMP_HTF1",
+                "SOLAR6_MINCOST_TS",
+                "SOLAR7_MAXEFF_RE",
+                "SOLAR10_MINCOST_UNCONSTRAINED",
+            ],
+        )
+        self.assertNotIn("SOLAR8_MAXHF_MINCOST", names)
+        self.assertNotIn("SOLAR9_MAXNRG_MINPAR", names)
+        self.assertNotIn("SOLAR11_MINCOST_CH", names)
+
+        for row in rows:
+            problem = solar_python_load(row["name"])
+            self.assertEqual(row["ptype"], problem.ptype)
+            self.assertEqual(int(row["dim"]), problem.n)
+            self.assertEqual(int(row["mb"]), problem.mb)
+            self.assertEqual(int(row["mlcon"]), problem.mlcon)
+            self.assertEqual(int(row["mnlcon"]), problem.mnlcon)
+            self.assertEqual(int(row["mcon"]), problem.mcon)
 
     def test_load_and_evaluate_fast_problem(self):
         problem = solar_python_load("SOLAR1_MAXNRG_H1")

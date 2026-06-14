@@ -52,14 +52,17 @@ jobs:
             solar_adapter/build/solar-runtime/ runtime/solar/
           rm -f runtime/solar/bin/solar runtime/solar/src/*.o runtime/solar/.build.lock
 
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install git+https://github.com/optiprofiler/optiprofiler.git
+
       - name: Regenerate probinfo
         run: |
           python scripts/collect_info.py
 
       - name: Run tests
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install git+https://github.com/optiprofiler/optiprofiler.git
           python -m unittest discover -s tests -p 'test_*.py'
 
       - name: Commit runtime update

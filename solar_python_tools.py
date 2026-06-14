@@ -27,7 +27,7 @@ class SolarExecutionError(RuntimeError):
 
 
 def solar_python_collect_info():
-    """Return the SOLAR problem metadata rows used by `solar_python_select`."""
+    """Return the SOLAR problem rows used by `solar_python_select`."""
 
     with PROBINFO_PATH.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
@@ -56,25 +56,33 @@ def solar_python_select(options=None):
     for key, value in defaults.items():
         options.setdefault(key, value)
 
-    metadata = _load_metadata()
+    enabled_names = {
+        problem["name"]
+        for problem in _load_metadata()
+        if problem.get("enabled", False)
+    }
     selected = []
-    for problem in metadata:
-        if not problem.get("enabled", False):
+    for row in solar_python_collect_info():
+        if row["name"] not in enabled_names:
             continue
-        row = _row(problem)
         if row["name"] in options["excludelist"]:
             continue
         if row["ptype"] not in options["ptype"]:
             continue
-        if not (options["mindim"] <= row["dim"] <= options["maxdim"]):
+        dim = int(row["dim"])
+        mb = int(row["mb"])
+        mlcon = int(row["mlcon"])
+        mnlcon = int(row["mnlcon"])
+        mcon = int(row["mcon"])
+        if not (options["mindim"] <= dim <= options["maxdim"]):
             continue
-        if not (options["minb"] <= row["mb"] <= options["maxb"]):
+        if not (options["minb"] <= mb <= options["maxb"]):
             continue
-        if not (options["minlcon"] <= row["mlcon"] <= options["maxlcon"]):
+        if not (options["minlcon"] <= mlcon <= options["maxlcon"]):
             continue
-        if not (options["minnlcon"] <= row["mnlcon"] <= options["maxnlcon"]):
+        if not (options["minnlcon"] <= mnlcon <= options["maxnlcon"]):
             continue
-        if not (options["mincon"] <= row["mcon"] <= options["maxcon"]):
+        if not (options["mincon"] <= mcon <= options["maxcon"]):
             continue
         selected.append(row["name"])
     return selected
@@ -145,19 +153,15 @@ def _problem_by_name(problem_name):
 
 
 def _row(problem):
-    mb = sum(
-        value is not None and math.isfinite(float(value))
-        for value in problem["xl"] + problem["xu"]
-    )
-    ptype = "n" if problem["m_constraints"] > 0 else ("b" if mb > 0 else "u")
+    mb = int(problem.mb)
     return {
-        "name": problem["name"],
-        "ptype": ptype,
-        "dim": int(problem["n"]),
-        "mb": int(mb),
-        "mlcon": 0,
-        "mnlcon": int(problem["m_constraints"]),
-        "mcon": int(problem["m_constraints"]),
+        "name": problem.name,
+        "ptype": problem.ptype,
+        "dim": int(problem.n),
+        "mb": mb,
+        "mlcon": int(problem.mlcon),
+        "mnlcon": int(problem.mnlcon),
+        "mcon": int(problem.mcon),
     }
 
 

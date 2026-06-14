@@ -24,9 +24,12 @@ not try to compile and link the same runtime at the same time.
 ## Automation
 
 `scripts/collect_info.py` regenerates
-`runtime/solar/metadata/probinfo.csv` from the vendored runtime metadata. The
-CI workflow checks that this generated file is committed, runs wrapper tests,
-and verifies that local build artifacts stay ignored.
+`runtime/solar/metadata/probinfo.csv` by loading each enabled SOLAR problem
+through `solar_python_load` and reading the resulting OptiProfiler `Problem`
+fields. The vendored metadata is still needed to construct each problem, but the
+selection index is derived from the wrapper contract that users actually call.
+The CI workflow checks that this generated file is committed, runs wrapper
+tests, and verifies that local build artifacts stay ignored.
 
 The runtime-sync workflow listens for manual runs or `repository_dispatch`
 events from `solar_adapter`. It exports a slim SOLAR runtime from the adapter,
@@ -52,6 +55,15 @@ library filename inference.
 SOLAR 8 and 9 are multiobjective and are not returned by the first scalar
 OptiProfiler selector. SOLAR 11 is disabled for now because upstream SOLAR
 v1.0.8 returns an empty output at the documented initial point.
+
+## License and Provenance
+
+The runtime manifest records the exact upstream SOLAR commit. The upstream
+repository provides an LGPL-2.1 license file, while current SOLAR source headers
+refer to LGPL version 3 or later. This wrapper preserves both the license file
+and the source notices from the upstream snapshot; downstream distributions
+should keep the manifest, license text, source notices, and upstream URL
+together.
 
 ## Runtime Expectations
 

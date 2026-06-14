@@ -1,49 +1,44 @@
 #!/usr/bin/env python3
-"""Regenerate SOLAR Python probinfo from runtime metadata."""
+"""Regenerate SOLAR Python probinfo from the OptiProfiler wrapper."""
 
 from __future__ import annotations
 
 import argparse
 import csv
-import json
-import math
+import sys
 from pathlib import Path
-
-
-def finite_count(values):
-    return sum(value is not None and math.isfinite(float(value)) for value in values)
-
-
-def row(problem):
-    mb = finite_count(problem["xl"]) + finite_count(problem["xu"])
-    ptype = "n" if int(problem["m_constraints"]) > 0 else ("b" if mb > 0 else "u")
-    return {
-        "name": problem["name"],
-        "ptype": ptype,
-        "dim": int(problem["n"]),
-        "mb": int(mb),
-        "mlcon": 0,
-        "mnlcon": int(problem["m_constraints"]),
-        "mcon": int(problem["m_constraints"]),
-    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--metadata",
-        type=Path,
-        default=Path("runtime/solar/metadata/problems.json"),
-    )
-    parser.add_argument(
         "--output",
         type=Path,
         default=Path("runtime/solar/metadata/probinfo.csv"),
     )
+    parser.add_argument(
+        "--optiprofiler-src",
+        type=Path,
+        default=None,
+        help="Optional path containing the optiprofiler Python package.",
+    )
     args = parser.parse_args()
 
-    problems = json.loads(args.metadata.read_text(encoding="utf-8"))
-    rows = [row(problem) for problem in problems]
+    repo_dir = Path(__file__).resolve().parents[1]
+    if args.optiprofiler_src is not None:
+        sys.path.insert(0, str(args.optiprofiler_src.resolve()))
+    local_op_src = repo_dir.parents[1] / "optiprofiler" / "python"
+    if local_op_src.exists():
+        sys.path.insert(0, str(local_op_src))
+    sys.path.insert(0, str(repo_dir))
+
+    from solar_python_tools import _load_metadata, _row, solar_python_load
+
+    rows = []
+    for metadata in _load_metadata():
+        if not metadata.get("enabled", False):
+            continue
+        rows.append(_row(solar_python_load(metadata["name"])))
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", newline="", encoding="utf-8") as handle:
