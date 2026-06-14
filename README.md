@@ -25,8 +25,8 @@ not try to compile and link the same runtime at the same time.
 
 `scripts/collect_info.py` regenerates
 `runtime/solar/metadata/probinfo.csv` by loading each enabled SOLAR problem
-through `solar_python_load` and reading the resulting OptiProfiler `Problem`
-fields. The vendored metadata is still needed to construct each problem, but the
+through `solar_load` and reading the resulting OptiProfiler `Problem` fields.
+The vendored metadata is still needed to construct each problem, but the
 selection index is derived from the wrapper contract that users actually call.
 The CI workflow checks that this generated file is committed, runs wrapper
 tests, and verifies that local build artifacts stay ignored.
@@ -39,18 +39,18 @@ commits only source, metadata, license, and provenance files.
 ## Usage
 
 ```python
-from solar_python import solar_python_load, solar_python_select
+from solar import solar_load, solar_select
 
-names = solar_python_select({"ptype": "n", "maxdim": 20})
-problem = solar_python_load(names[0])
+names = solar_select({"ptype": "n", "maxdim": 20})
+problem = solar_load(names[0])
 print(problem.fun(problem.x0))
 ```
 
-For convenience, `solar_load`, `solar_select`, and `solar_collect_info` are also
-available as aliases. The canonical OptiProfiler tools module is
-`solar_python_tools.py`, with `solar_python_load` and `solar_python_select`, so
-the repository can be used as `plib="solar_python"` without relying on custom
-library filename inference.
+In OptiProfiler, use this adapter as the problem library `solar`, for example
+`benchmark(solvers, plibs=["solar"], ...)`. The repository still keeps
+`solar_python_*` compatibility entry points internally because the GitHub source
+repository is language-specific, but the public problem-library name is
+`solar`.
 
 SOLAR 8 and 9 are multiobjective and are not returned by the first scalar
 OptiProfiler selector. SOLAR 11 is disabled for now because upstream SOLAR
