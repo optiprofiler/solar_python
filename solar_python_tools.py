@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import csv
-import fcntl
 import inspect
 import json
 import math
@@ -195,7 +194,7 @@ def _prepare_solar_input(metadata, x):
 
 def _ensure_executable():
     configured = os.environ.get("SOLAR_EXECUTABLE")
-    executable = Path(configured) if configured else RUNTIME_DIR / "bin" / "solar"
+    executable = Path(configured) if configured else _default_executable()
     if executable.exists():
         return executable
 
@@ -204,7 +203,7 @@ def _ensure_executable():
             return executable
         executable.parent.mkdir(parents=True, exist_ok=True)
         completed = subprocess.run(
-            ["make", "-C", str(RUNTIME_DIR / "src")],
+            _make_command(),
             check=False,
             capture_output=True,
             text=True,
@@ -219,26 +218,44 @@ def _ensure_executable():
     return executable
 
 
+def _default_executable():
+    suffix = ".exe" if os.name == "nt" else ""
+    return RUNTIME_DIR / "bin" / f"solar{suffix}"
+
+
+def _make_command():
+    command = ["make", "-C", str(RUNTIME_DIR / "src")]
+    if os.name == "nt":
+        command.append("EXEEXT=.exe")
+        command.append("LIBS=-lm")
+    return command
+
+
 @contextmanager
 def _build_lock(timeout_sec=600.0):
-    lock_path = RUNTIME_DIR / ".build.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = RUNTIME_DIR / ".build.lock.d"
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout_sec
-    with lock_path.open("w", encoding="utf-8") as lock_file:
-        while True:
-            try:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError as exc:
-                if time.monotonic() >= deadline:
-                    raise SolarExecutionError(
-                        "Timed out waiting for another process to build SOLAR"
-                    ) from exc
-                time.sleep(0.1)
+    acquired = False
+    while True:
         try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            lock_path.mkdir()
+            acquired = True
+            break
+        except FileExistsError as exc:
+            if time.monotonic() >= deadline:
+                raise SolarExecutionError(
+                    "Timed out waiting for another process to build SOLAR"
+                ) from exc
+            time.sleep(0.1)
+    try:
+        yield
+    finally:
+        if acquired:
+            try:
+                lock_path.rmdir()
+            except OSError:
+                pass
 
 
 def _run_solar(executable, problem_id, x, n_objectives, n_constraints, timeout_sec=300.0):

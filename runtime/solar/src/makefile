@@ -1,4 +1,5 @@
-EXE                = ../bin/solar
+EXEEXT             =
+EXE                = ../bin/solar$(EXEEXT)
 COMPILATOR         = g++
 COMPILATOR_OPTIONS = -O3 -Wall -Wextra -pedantic -Wcast-align
 LIBS               = -lc -lm

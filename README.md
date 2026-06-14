@@ -8,7 +8,8 @@ but intentionally excludes upstream SOLAR's large `tests/` directory.
 
 The repository should stay lightweight. Commit the runtime source, metadata,
 license, and provenance files; do not commit upstream `.git`, upstream `tests/`,
-`runtime/solar/bin/solar`, or `runtime/solar/src/*.o`.
+`runtime/solar/bin/solar`, `runtime/solar/bin/solar.exe`, or
+`runtime/solar/src/*.o`.
 
 ## Build Runtime
 
@@ -17,9 +18,15 @@ make -C runtime/solar/src
 ```
 
 The binary is generated at `runtime/solar/bin/solar` and is ignored by git.
+On Windows, the binary is generated at `runtime/solar/bin/solar.exe`.
 The Python wrapper also builds this binary on first use if it is missing. First
-build is protected by a local file lock, so parallel OptiProfiler workers do
+build is protected by a local directory lock, so parallel OptiProfiler workers do
 not try to compile and link the same runtime at the same time.
+
+The build requires `make` and a C++ compiler compatible with upstream SOLAR.
+On Linux and macOS this is usually the system `make` plus `g++`/Clang. On
+Windows, use MSYS2/MinGW or an equivalent environment that exposes `make` and
+`g++` on `PATH`.
 
 ## Automation
 

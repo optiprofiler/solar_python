@@ -1,6 +1,7 @@
 from pathlib import Path
 import math
 import multiprocessing as mp
+import os
 import shutil
 import sys
 import unittest
@@ -22,6 +23,11 @@ from solar_python import (
 def _parallel_load_and_eval(problem_name):
     problem = solar_python_load(problem_name)
     return problem.name, problem.n, math.isfinite(problem.fun(problem.x0))
+
+
+def _solar_executable_path(runtime_dir):
+    suffix = ".exe" if os.name == "nt" else ""
+    return runtime_dir / "bin" / f"solar{suffix}"
 
 
 class SolarPythonTests(unittest.TestCase):
@@ -130,9 +136,7 @@ class SolarPythonTests(unittest.TestCase):
         shutil.rmtree(runtime_dir / "bin", ignore_errors=True)
         for object_file in (runtime_dir / "src").glob("*.o"):
             object_file.unlink()
-        lock_file = runtime_dir / ".build.lock"
-        if lock_file.exists():
-            lock_file.unlink()
+        shutil.rmtree(runtime_dir / ".build.lock.d", ignore_errors=True)
 
         problem_names = [
             "SOLAR1_MAXNRG_H1",
@@ -143,7 +147,7 @@ class SolarPythonTests(unittest.TestCase):
         with mp.get_context("spawn").Pool(4) as pool:
             results = pool.map(_parallel_load_and_eval, problem_names)
 
-        self.assertTrue((runtime_dir / "bin" / "solar").exists())
+        self.assertTrue(_solar_executable_path(runtime_dir).exists())
         self.assertEqual([name for name, _, _ in results], problem_names)
         self.assertTrue(all(is_finite for _, _, is_finite in results))
 

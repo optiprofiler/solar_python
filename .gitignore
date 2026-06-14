@@ -1,6 +1,7 @@
 runtime/solar/bin/solar
+runtime/solar/bin/solar.exe
 runtime/solar/src/*.o
-runtime/solar/.build.lock
+runtime/solar/.build.lock.d/
 __pycache__/
 .pytest_cache/
 .DS_Store

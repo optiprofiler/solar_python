@@ -48,9 +48,11 @@ jobs:
         run: |
           rsync -a --delete \
             --exclude='bin/solar' \
+            --exclude='bin/solar.exe' \
             --exclude='src/*.o' \
             solar_adapter/build/solar-runtime/ runtime/solar/
-          rm -f runtime/solar/bin/solar runtime/solar/src/*.o runtime/solar/.build.lock
+          rm -f runtime/solar/bin/solar runtime/solar/bin/solar.exe runtime/solar/src/*.o
+          rm -rf runtime/solar/.build.lock.d
 
       - name: Install dependencies
         run: |
@@ -67,7 +69,8 @@ jobs:
 
       - name: Commit runtime update
         run: |
-          rm -f runtime/solar/bin/solar runtime/solar/src/*.o runtime/solar/.build.lock
+          rm -f runtime/solar/bin/solar runtime/solar/bin/solar.exe runtime/solar/src/*.o
+          rm -rf runtime/solar/.build.lock.d
           git add runtime/solar
           if git diff --staged --quiet; then
             echo "No runtime changes detected."
