@@ -53,6 +53,22 @@ problem = solar_load(names[0])
 print(problem.fun(problem.x0))
 ```
 
+## Public API
+
+The public problem-library name is `solar`. User-facing code should normally
+use the following entry points:
+
+- `solar_load(problem_name)` loads one enabled scalar SOLAR problem as an
+  OptiProfiler `Problem` instance.
+- `solar_select(options)` returns enabled scalar SOLAR problem names satisfying
+  OptiProfiler-style selection criteria.
+- `solar_collect_info()` returns the committed problem-information table used
+  by `solar_select`.
+
+This repository also keeps `solar_python_load`, `solar_python_select`, and
+`solar_python_collect_info` as Python-specific implementation and compatibility
+entry points. They are not the preferred names for user code.
+
 In OptiProfiler, use this adapter as the problem library `solar`, for example
 `benchmark(solvers, plibs=["solar"], ...)`. The GitHub source repository name is
 language-specific, but the public problem-library name is `solar`.
