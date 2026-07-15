@@ -11,8 +11,40 @@
   "synced_at": "2026-06-12T00:00:00+00:00",
   "policy": {
     "strategy": "track-upstream-latest-with-recorded-commit",
-    "vendor_source": false,
-    "commit_upstream_checkout": false
+    "commit_upstream_checkout": false,
+    "vendor_complete_upstream_checkout": false
+  },
+  "distribution": {
+    "license_expression": "BSD-3-Clause AND LGPL-2.1-only AND LGPL-3.0-or-later",
+    "contains_upstream_source_subset": true,
+    "adapter": {
+      "license": "BSD-3-Clause",
+      "license_file": "LICENSE"
+    },
+    "upstream_repository_files": {
+      "license": "LGPL-2.1-only",
+      "paths": [
+        "runtime/solar/src/makefile",
+        "runtime/solar/README.upstream.md"
+      ],
+      "license_file": "runtime/solar/LICENSE"
+    },
+    "upstream_license_text": {
+      "path": "runtime/solar/LICENSE",
+      "identifier": "LGPL-2.1-only",
+      "role": "verbatim upstream repository license and conservative basis for unheaded upstream files"
+    },
+    "upstream_source_headers": {
+      "license": "LGPL-3.0-or-later",
+      "patterns": [
+        "runtime/solar/src/*.cpp",
+        "runtime/solar/src/*.hpp"
+      ],
+      "license_files": [
+        "licenses/GPL-3.0.txt",
+        "licenses/LGPL-3.0.txt"
+      ]
+    },
+    "notice_file": "THIRD_PARTY_NOTICES.md"
   }
 }
-

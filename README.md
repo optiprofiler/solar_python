@@ -111,12 +111,20 @@ v1.0.8 returns an empty output at the documented initial point.
 
 ## License and Provenance
 
-The runtime manifest records the exact upstream SOLAR commit. The upstream
-repository provides an LGPL-2.1 license file, while current SOLAR source headers
-refer to LGPL version 3 or later. This wrapper preserves both the license file
-and the source notices from the upstream snapshot; downstream distributions
-should keep the manifest, license text, source notices, and upstream URL
-together.
+The Python adapter, plugin integration, generated metadata, and wrapper
+documentation are licensed under the [BSD 3-Clause License](LICENSE). The
+distribution also contains a slim upstream SOLAR source subset, so its complete
+license metadata is recorded conservatively as
+`BSD-3-Clause AND LGPL-2.1-only AND LGPL-3.0-or-later`.
+
+The runtime manifest records the exact upstream SOLAR commit and the file-level
+license mapping. All 49 distributed C++ source and header files retain their
+explicit LGPL-3.0-or-later notices. The unheaded upstream makefile and README
+are recorded as LGPL-2.1-only based on the upstream repository license. The
+original LGPL-2.1 text is preserved unchanged, and the official GPLv3 and
+LGPLv3 texts are included for the LGPLv3-covered source files. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the complete component
+boundaries and paths.
 
 ## Runtime Expectations
 

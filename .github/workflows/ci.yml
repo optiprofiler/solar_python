@@ -79,11 +79,16 @@ jobs:
 
       - name: Regenerate probinfo
         run: |
+          python scripts/annotate_runtime_manifest.py
+          git diff --exit-code runtime/solar/manifest.json
           python scripts/collect_info.py
           git diff --exit-code runtime/solar/metadata/probinfo.csv
 
       - name: Build wheel and source distribution
         run: python -m build
+
+      - name: Check distribution licenses and contents
+        run: python scripts/check_distribution_licenses.py
 
       - name: Run Python tests
         run: |

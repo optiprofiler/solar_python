@@ -55,6 +55,7 @@ jobs:
             solar_adapter/build/solar-runtime/ runtime/solar/
           rm -f runtime/solar/bin/solar runtime/solar/bin/solar.exe runtime/solar/src/*.o
           rm -rf runtime/solar/.build.lock.d
+          python scripts/annotate_runtime_manifest.py
 
       - name: Install dependencies
         run: |
