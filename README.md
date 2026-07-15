@@ -11,17 +11,49 @@ license, and provenance files; do not commit upstream `.git`, upstream `tests/`,
 `runtime/solar/bin/solar`, `runtime/solar/bin/solar.exe`, or
 `runtime/solar/src/*.o`.
 
+## Package and Plugin
+
+This package definition is a development build for the API-v1 protocol. The
+corresponding OptiProfiler release and this plugin distribution have not been
+published yet. Until that release exists, test from checkouts with `--no-deps`
+as shown below; the `0.1.0` package value is build metadata, not a release
+announcement.
+
+The Python distribution name is `optiprofiler-solar`. It installs the adapter
+package `optiprofiler_solar` and registers the problem-library entry point
+
+```toml
+[project.entry-points."optiprofiler.problem_libraries"]
+solar = "optiprofiler_solar:get_problem_library"
+```
+
+SOLAR currently has no library-specific configuration. The plugin therefore
+uses an empty options mapping: `benchmark(..., plib_options={"solar": {}})` is
+valid, while nonempty SOLAR-specific options are rejected by OptiProfiler before
+the benchmark starts.
+
+For local development against a checked-out OptiProfiler core:
+
+```bash
+python -m pip install -e /path/to/optiprofiler
+python -m pip install -e . --no-deps --no-build-isolation
+```
+
 ## Build Runtime
 
 ```bash
 make -C runtime/solar/src
 ```
 
-The binary is generated at `runtime/solar/bin/solar` and is ignored by git.
-On Windows, the binary is generated at `runtime/solar/bin/solar.exe`.
-The Python wrapper also builds this binary on first use if it is missing. First
-build is protected by a local directory lock, so parallel OptiProfiler workers do
-not try to compile and link the same runtime at the same time.
+For a source checkout, this command generates `runtime/solar/bin/solar` (or
+`solar.exe` on Windows), and that file is ignored by git. The Python wrapper
+uses a source-checkout binary when present. Otherwise, including after a wheel
+installation, it copies the packaged source to a versioned user cache and
+builds there; it never writes generated files into `site-packages`. Set
+`SOLAR_CACHE_DIR` to choose the cache root or `SOLAR_EXECUTABLE` to use an
+existing binary. First build is protected by a local directory lock, so
+parallel OptiProfiler workers do not compile and link the same runtime at the
+same time.
 
 The build requires `make` and a C++ compiler compatible with upstream SOLAR.
 On Linux and macOS this is usually the system `make` plus `g++`/Clang. On

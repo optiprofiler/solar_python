@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import contextmanager
 import csv
 import inspect
@@ -7,6 +8,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import time
@@ -23,6 +25,33 @@ PROBINFO_PATH = RUNTIME_DIR / "metadata" / "probinfo.csv"
 
 class SolarExecutionError(RuntimeError):
     pass
+
+
+def solar_validate_options(library_options):
+    """Validate SOLAR library-specific options.
+
+    SOLAR currently has no library-specific configuration. The function exists
+    for direct-call hygiene only; the OptiProfiler plugin intentionally omits
+    get_default_options/validate_options so core rejects nonempty
+    ``plib_options['solar']`` before benchmark execution.
+    """
+
+    if library_options is None:
+        return {}
+    if not isinstance(library_options, Mapping):
+        raise TypeError("SOLAR library options must be a mapping.")
+    options = dict(library_options)
+    if options:
+        raise ValueError(
+            "SOLAR does not define library-specific options; pass an empty mapping."
+        )
+    return {}
+
+
+def solar_check_available():
+    """Raise an informative exception if the SOLAR executable cannot be used."""
+
+    _ensure_executable()
 
 
 def solar_python_collect_info():
@@ -45,7 +74,7 @@ def solar_python_collect_info():
         return list(csv.DictReader(handle))
 
 
-def solar_python_select(options=None):
+def solar_python_select(options=None, library_options=None):
     """
     Select SOLAR problems satisfying OptiProfiler-style criteria.
 
@@ -64,6 +93,7 @@ def solar_python_select(options=None):
         Names of enabled scalar SOLAR problems satisfying the criteria.
     """
 
+    solar_validate_options(library_options)
     if options is None:
         options = {}
     options = dict(options)
@@ -116,7 +146,7 @@ def solar_python_select(options=None):
     return selected
 
 
-def solar_python_load(problem_name):
+def solar_python_load(problem_name, library_options=None):
     """
     Convert a SOLAR problem name to an OptiProfiler ``Problem`` instance.
 
@@ -137,6 +167,7 @@ def solar_python_load(problem_name):
         through ``cub``.
     """
 
+    solar_validate_options(library_options)
     metadata = _problem_by_name(problem_name)
     if not metadata.get("enabled", False):
         raise ValueError(f"SOLAR problem is disabled: {problem_name}")
@@ -241,16 +272,28 @@ def _prepare_solar_input(metadata, x):
 
 def _ensure_executable():
     configured = os.environ.get("SOLAR_EXECUTABLE")
-    executable = Path(configured) if configured else _default_executable()
+    if configured:
+        executable = Path(configured).expanduser().resolve()
+        if executable.is_file():
+            return executable
+        raise SolarExecutionError(
+            f"SOLAR_EXECUTABLE does not point to a file: {executable}"
+        )
+
+    executable = _default_executable()
     if executable.exists():
         return executable
 
-    with _build_lock():
+    cache_dir = _runtime_cache_dir()
+    with _build_lock(cache_dir):
         if executable.exists():
             return executable
+        source_dir = cache_dir / "src"
+        shutil.rmtree(source_dir, ignore_errors=True)
+        shutil.copytree(RUNTIME_DIR / "src", source_dir)
         executable.parent.mkdir(parents=True, exist_ok=True)
         completed = subprocess.run(
-            _make_command(),
+            _make_command(source_dir),
             check=False,
             capture_output=True,
             text=True,
@@ -267,11 +310,31 @@ def _ensure_executable():
 
 def _default_executable():
     suffix = ".exe" if os.name == "nt" else ""
-    return RUNTIME_DIR / "bin" / f"solar{suffix}"
+    source_executable = RUNTIME_DIR / "bin" / f"solar{suffix}"
+    if source_executable.is_file():
+        return source_executable
+    return _runtime_cache_dir() / "bin" / f"solar{suffix}"
 
 
-def _make_command():
-    command = ["make", "-C", str(RUNTIME_DIR / "src")]
+def _runtime_cache_dir():
+    configured = os.environ.get("SOLAR_CACHE_DIR")
+    if configured:
+        cache_root = Path(configured).expanduser()
+    else:
+        cache_root = Path(
+            os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")
+        ).expanduser() / "optiprofiler" / "solar"
+
+    try:
+        with (RUNTIME_DIR / "manifest.json").open(encoding="utf-8") as handle:
+            cache_key = json.load(handle)["upstream"]["commit"][:12]
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        cache_key = "unversioned"
+    return cache_root.resolve() / cache_key
+
+
+def _make_command(source_dir):
+    command = ["make", "-C", str(source_dir)]
     if os.name == "nt":
         command.append("EXEEXT=.exe")
         command.append("LIBS=-lm")
@@ -279,9 +342,9 @@ def _make_command():
 
 
 @contextmanager
-def _build_lock(timeout_sec=600.0):
-    lock_path = RUNTIME_DIR / ".build.lock.d"
-    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+def _build_lock(cache_dir, timeout_sec=600.0):
+    lock_path = cache_dir / ".build.lock.d"
+    cache_dir.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout_sec
     acquired = False
     while True:
@@ -412,7 +475,7 @@ def solar_collect_info():
     return solar_python_collect_info()
 
 
-def solar_select(options=None):
+def solar_select(options=None, library_options=None):
     """
     Select SOLAR problems satisfying OptiProfiler-style criteria.
 
@@ -484,10 +547,10 @@ def solar_select(options=None):
         names = solar_select({"ptype": "n", "maxdim": 20})
     """
 
-    return solar_python_select(options)
+    return solar_python_select(options, library_options=library_options)
 
 
-def solar_load(problem_name):
+def solar_load(problem_name, library_options=None):
     """
     Convert a SOLAR problem name to an OptiProfiler ``Problem`` instance.
 
@@ -535,4 +598,4 @@ def solar_load(problem_name):
         print(problem.fun(problem.x0))
     """
 
-    return solar_python_load(problem_name)
+    return solar_python_load(problem_name, library_options=library_options)

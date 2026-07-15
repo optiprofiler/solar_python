@@ -4,6 +4,7 @@ import multiprocessing as mp
 import os
 import shutil
 import sys
+import tempfile
 import unittest
 import numpy as np
 
@@ -18,6 +19,7 @@ from solar_python import (
     solar_python_select,
     solar_select,
 )
+from solar_python import solar_python_tools
 
 
 def _parallel_load_and_eval(problem_name):
@@ -136,20 +138,31 @@ class SolarPythonTests(unittest.TestCase):
         shutil.rmtree(runtime_dir / "bin", ignore_errors=True)
         for object_file in (runtime_dir / "src").glob("*.o"):
             object_file.unlink()
-        shutil.rmtree(runtime_dir / ".build.lock.d", ignore_errors=True)
-
         problem_names = [
             "SOLAR1_MAXNRG_H1",
             "SOLAR6_MINCOST_TS",
             "SOLAR7_MAXEFF_RE",
             "SOLAR10_MINCOST_UNCONSTRAINED",
         ]
-        with mp.get_context("spawn").Pool(4) as pool:
-            results = pool.map(_parallel_load_and_eval, problem_names)
+        previous_cache = os.environ.get("SOLAR_CACHE_DIR")
+        try:
+            with tempfile.TemporaryDirectory(prefix="solar-build-test-") as tmp:
+                os.environ["SOLAR_CACHE_DIR"] = tmp
+                with mp.get_context("spawn").Pool(4) as pool:
+                    results = pool.map(_parallel_load_and_eval, problem_names)
 
-        self.assertTrue(_solar_executable_path(runtime_dir).exists())
-        self.assertEqual([name for name, _, _ in results], problem_names)
-        self.assertTrue(all(is_finite for _, _, is_finite in results))
+                executable = solar_python_tools._runtime_cache_dir() / "bin" / (
+                    "solar.exe" if os.name == "nt" else "solar"
+                )
+                self.assertTrue(executable.exists())
+                self.assertEqual([name for name, _, _ in results], problem_names)
+                self.assertTrue(all(is_finite for _, _, is_finite in results))
+                self.assertFalse(any((runtime_dir / "src").glob("*.o")))
+        finally:
+            if previous_cache is None:
+                os.environ.pop("SOLAR_CACHE_DIR", None)
+            else:
+                os.environ["SOLAR_CACHE_DIR"] = previous_cache
 
 
 if __name__ == "__main__":

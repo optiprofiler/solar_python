@@ -27,6 +27,16 @@ jobs:
           path: optiprofiler
           ref: main
 
+      - name: Bootstrap the API-v1 protocol under development
+        shell: bash
+        run: |
+          protocol_file="optiprofiler/python/optiprofiler/problem_libraries.py"
+          if ! test -f "$protocol_file" || ! grep -q "class ProblemLibraryPlugin" "$protocol_file"; then
+            git -C optiprofiler fetch --depth=1 origin python
+            git -C optiprofiler checkout --detach FETCH_HEAD
+          fi
+          grep -q "PROBLEM_LIBRARY_API_VERSION = 1" "$protocol_file"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -50,7 +60,9 @@ jobs:
       - name: Install OptiProfiler
         run: |
           python -m pip install --upgrade pip
+          python -m pip install build
           python -m pip install -e optiprofiler
+          python -m pip install -e . --no-deps --no-build-isolation
 
       - name: Build SOLAR runtime
         shell: bash
@@ -70,9 +82,36 @@ jobs:
           python scripts/collect_info.py
           git diff --exit-code runtime/solar/metadata/probinfo.csv
 
+      - name: Build wheel and source distribution
+        run: python -m build
+
       - name: Run Python tests
         run: |
           python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Fresh installed plugin smoke
+        shell: bash
+        run: |
+          wheel="$(python -c 'from pathlib import Path; print(next(Path("dist").glob("*.whl")).resolve())')"
+          python -m pip uninstall -y optiprofiler-solar
+          python -m pip install --no-deps "$wheel"
+          tmpdir="$(mktemp -d)"
+          cd "$tmpdir"
+          python - <<'PY'
+          from optiprofiler.problem_libraries import ProblemLibraryRef, load_problem_library
+          ref = ProblemLibraryRef(
+              "solar",
+              "entry_point",
+              "optiprofiler_solar:get_problem_library",
+              distribution="optiprofiler-solar",
+          )
+          plugin = load_problem_library(ref)
+          assert plugin.name == "solar"
+          assert "SOLAR10_MINCOST_UNCONSTRAINED" in plugin.select({"ptype": "b", "maxdim": 5}, {})
+          plugin.check_available()
+          problem = plugin.load("SOLAR10_MINCOST_UNCONSTRAINED", {})
+          assert float(problem.fun(problem.x0)) == 1880.297
+          PY
 
       - name: Ensure generated runtime artifacts are not tracked changes
         if: always()
