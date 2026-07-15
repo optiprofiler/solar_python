@@ -1,0 +1,6 @@
+LICENSE text eol=lf
+THIRD_PARTY_NOTICES.md text eol=lf
+licenses/*.txt text eol=lf
+runtime/solar/LICENSE text eol=lf
+runtime/solar/README.upstream.md text eol=lf
+runtime/solar/src/makefile text eol=lf
