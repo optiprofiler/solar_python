@@ -78,12 +78,52 @@ commits only source, metadata, license, and provenance files.
 ## Usage
 
 ```python
-from solar_tools import solar_load, solar_select
+from optiprofiler_solar import solar_load, solar_select
 
 names = solar_select({"ptype": "n", "maxdim": 20})
 problem = solar_load(names[0])
 print(problem.fun(problem.x0))
 ```
+
+The installed plugin is discoverable without compiling or importing the SOLAR
+runtime:
+
+```python
+from optiprofiler import list_problem_libraries
+
+assert "solar" in list_problem_libraries()
+```
+
+Select it with `benchmark(..., plibs=["solar"])`; an installed plugin needs no
+filesystem path.
+
+## Update and Uninstall
+
+For the unpublished development distribution, update the compatible feature
+branch and reinstall it explicitly:
+
+```bash
+git pull --ff-only
+python -m pip install -e . --no-deps --no-build-isolation
+```
+
+The OptiProfiler core repository records its tested adapter commit in
+`problem_libraries.lock`. Updating the adapter source and updating the compiled
+runtime cache are separate operations: the wrapper selects a versioned cache
+directory from the packaged runtime manifest and rebuilds there when needed.
+
+Remove the adapter distribution with:
+
+```bash
+python -m pip uninstall optiprofiler-solar
+```
+
+This removes the adapter, entry point, and the slim runtime source installed
+inside that distribution. It preserves `SOLAR_CACHE_DIR`, the default
+`~/.cache/optiprofiler/solar/<commit>` cache, any executable selected through
+`SOLAR_EXECUTABLE`, and user benchmark output. Removing the OptiProfiler core
+also leaves this independently installed adapter and its cache in place; the
+adapter becomes usable again after a compatible core is installed.
 
 ## Public API
 
