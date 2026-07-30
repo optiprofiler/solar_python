@@ -1,0 +1,43 @@
+name: Daily random wrapper smoke
+
+on:
+  schedule:
+    # 07:00 Beijing time.
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  random-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      NUMEXPR_NUM_THREADS: "2"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout OptiProfiler
+        uses: actions/checkout@v4
+        with:
+          repository: optiprofiler/optiprofiler
+          path: optiprofiler
+          ref: python
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned provider
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e optiprofiler
+          python -m pip install -e . --no-deps --no-build-isolation
+          make -C runtime/solar/src
+
+      - name: Evaluate a reproducible fast subset
+        run: python scripts/random_smoke.py --count 2 --max-workers 2

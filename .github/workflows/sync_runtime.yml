@@ -1,53 +1,48 @@
-name: Sync SOLAR Runtime
+name: Prepare SOLAR Runtime Candidate
 
 on:
   workflow_dispatch:
     inputs:
       adapter_ref:
-        description: "solar_adapter branch, tag, or commit"
-        required: false
-        default: "main"
-  repository_dispatch:
-    types: [solar-runtime-updated]
+        description: "Reviewed solar_adapter branch, tag, or commit"
+        required: true
+        type: string
+      upstream_commit:
+        description: "Exact reviewed bbopt/solar commit"
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  sync-runtime:
+  prepare-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     steps:
-      - name: Checkout repository
+      - name: Checkout provider repository
         uses: actions/checkout@v4
 
-      - name: Checkout solar_adapter
+      - name: Checkout reviewed solar_adapter revision
         uses: actions/checkout@v4
         with:
           repository: optiprofiler/solar_adapter
           path: solar_adapter
-          ref: ${{ github.event.client_payload.adapter_ref || github.event.inputs.adapter_ref || 'main' }}
+          ref: ${{ inputs.adapter_ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
-      - name: Configure Git identity
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-      - name: Generate slim runtime from adapter
+      - name: Generate candidate runtime
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SOLAR_SYNC_METHOD: git
+          SOLAR_UPSTREAM_REF: ${{ inputs.upstream_commit }}
         run: |
           bash solar_adapter/scripts/sync_solar.sh
           bash solar_adapter/scripts/export_runtime.sh solar_adapter/build/solar-runtime
-
-      - name: Copy runtime into Python wrapper
-        run: |
           rsync -a --delete \
             --exclude='bin/solar' \
             --exclude='bin/solar.exe' \
@@ -57,28 +52,19 @@ jobs:
           rm -rf runtime/solar/.build.lock.d
           python scripts/annotate_runtime_manifest.py
 
-      - name: Install dependencies
+      - name: Install and validate candidate
         run: |
           python -m pip install --upgrade pip
-          python -m pip install git+https://github.com/optiprofiler/optiprofiler.git
+          python -m pip install git+https://github.com/optiprofiler/optiprofiler.git@python
           python -m pip install -e . --no-deps --no-build-isolation
-
-      - name: Regenerate probinfo
-        run: |
           python scripts/collect_info.py
-
-      - name: Run tests
-        run: |
           python -m unittest discover -s tests -p 'test_*.py'
 
-      - name: Commit runtime update
-        run: |
-          rm -f runtime/solar/bin/solar runtime/solar/bin/solar.exe runtime/solar/src/*.o
-          rm -rf runtime/solar/.build.lock.d
-          git add runtime/solar
-          if git diff --staged --quiet; then
-            echo "No runtime changes detected."
-          else
-            git commit -m "Sync SOLAR runtime from adapter"
-            git push
-          fi
+      - name: Package candidate for maintainer review
+        run: tar -czf solar-python-runtime-candidate.tar.gz runtime/solar
+
+      - name: Upload candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: solar-python-runtime-candidate
+          path: solar-python-runtime-candidate.tar.gz

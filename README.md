@@ -70,10 +70,15 @@ selection index is derived from the wrapper contract that users actually call.
 The CI workflow checks that this generated file is committed, runs wrapper
 tests, and verifies that local build artifacts stay ignored.
 
-The runtime-sync workflow listens for manual runs or `repository_dispatch`
-events from `solar_adapter`. It exports a slim SOLAR runtime from the adapter,
-copies it into this repository, regenerates `probinfo.csv`, runs tests, and
-commits only source, metadata, license, and provenance files.
+`Prepare SOLAR Runtime Candidate` is a manual review tool. It requires an exact
+adapter revision and exact upstream SOLAR commit, exports a slim runtime, runs
+the wrapper tests, and uploads a candidate archive. It never commits the
+candidate. `Collect Info` is also manual and uploads regenerated metadata
+without changing the repository.
+
+The daily random smoke runs at 07:00 Beijing time. It records a reproducible
+seed, samples two metadata-reviewed fast problems, evaluates the complete
+wrapper at each initial point, and uses at most two worker processes.
 
 ## Usage
 
