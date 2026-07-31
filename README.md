@@ -15,9 +15,10 @@ license, and provenance files; do not commit upstream `.git`, upstream `tests/`,
 
 This package definition is a development build for the API-v1 protocol. The
 corresponding OptiProfiler release and this plugin distribution have not been
-published yet. Until that release exists, test from checkouts with `--no-deps`
-as shown below; the `0.1.0` package value is build metadata, not a release
-announcement.
+published yet. The protocol-enabled OptiProfiler development branch currently
+reports version `1.3.4`; the published `v1.3.4` tag predates the plugin protocol,
+so use the checked-out `python` branch until a protocol-enabled core is released.
+The `0.1.0` package value is build metadata, not a release announcement.
 
 The Python distribution name is `optiprofiler-solar`. It installs the adapter
 package `optiprofiler_solar` and registers the problem-library entry point
@@ -36,7 +37,7 @@ For local development against a checked-out OptiProfiler core:
 
 ```bash
 python -m pip install -e /path/to/optiprofiler
-python -m pip install -e . --no-deps --no-build-isolation
+python -m pip install -e . --no-build-isolation
 ```
 
 ## Build Runtime
@@ -109,7 +110,7 @@ branch and reinstall it explicitly:
 
 ```bash
 git pull --ff-only
-python -m pip install -e . --no-deps --no-build-isolation
+python -m pip install -e . --no-build-isolation
 ```
 
 The OptiProfiler core repository records its tested adapter commit in
