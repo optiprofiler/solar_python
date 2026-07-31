@@ -37,6 +37,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e optiprofiler
           python -m pip install -e . --no-build-isolation
+          mkdir -p runtime/solar/bin
           make -C runtime/solar/src
 
       - name: Evaluate a reproducible fast subset

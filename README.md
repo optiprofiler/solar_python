@@ -43,6 +43,7 @@ python -m pip install -e . --no-build-isolation
 ## Build Runtime
 
 ```bash
+mkdir -p runtime/solar/bin
 make -C runtime/solar/src
 ```
 
