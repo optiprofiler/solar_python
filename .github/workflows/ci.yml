@@ -62,7 +62,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install build "setuptools>=61" wheel
           python -m pip install -e optiprofiler
-          python -m pip install -e . --no-build-isolation
+          python -m pip install -e . --no-deps --no-build-isolation
 
       - name: Build SOLAR runtime
         shell: bash
@@ -99,7 +99,7 @@ jobs:
         run: |
           wheel="$(python -c 'from pathlib import Path; print(next(Path("dist").glob("*.whl")).resolve())')"
           python -m pip uninstall -y optiprofiler-solar
-          python -m pip install "$wheel"
+          python -m pip install --no-deps "$wheel"
           tmpdir="$(mktemp -d)"
           cd "$tmpdir"
           python - <<'PY'
