@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import contextmanager
 import csv
-import inspect
 import json
 import math
 import os
@@ -212,8 +211,13 @@ class _SolarProblemState:
         return float(self._eval(x)["objectives"][0])
 
     def cub(self, x):
-        if _is_problem_constructor_probe():
-            return np.full(self.metadata["m_constraints"], np.nan)
+        # Always return the simulated values. OptiProfiler's Problem evaluates
+        # cub(x0) once at construction to count the constraints; that single
+        # simulation is cached by _eval and reused by the truth evaluation of
+        # FeaturedProblem at x0 and by the first solver evaluation there.
+        # Returning placeholders for "the constructor" cannot be done safely:
+        # any caller-frame test also matched FeaturedProblem.__init__, whose
+        # initial constraint violation then became NaN.
         return np.asarray(self._eval(x)["constraints"], dtype=float)
 
 
@@ -432,13 +436,6 @@ def _parse_numeric_output(stdout):
 
 def _format_point(x):
     return " ".join(f"{float(value):.17g}" for value in x) + "\n"
-
-
-def _is_problem_constructor_probe():
-    for frame in inspect.stack(context=0):
-        if frame.function == "__init__" and frame.filename.endswith("opclasses.py"):
-            return True
-    return False
 
 
 def solar_collect_info():

@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import math
 import multiprocessing as mp
 import os
@@ -6,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import numpy as np
 
 op_root = Path(__file__).resolve().parents[3]
@@ -20,11 +22,24 @@ from solar_python import (
     solar_select,
 )
 from solar_python import solar_python_tools
+from optiprofiler import Feature, FeaturedProblem
 
 
 def _parallel_load_and_eval(problem_name):
     problem = solar_python_load(problem_name)
     return problem.name, problem.n, math.isfinite(problem.fun(problem.x0))
+
+
+def _stay_solver(fun, x0, xl, xu, aub, bub, aeq, beq, cub, ceq):
+    fun(x0)
+    return x0
+
+
+def _probe_solver(fun, x0, xl, xu, aub, bub, aeq, beq, cub, ceq):
+    fun(x0)
+    x = np.clip(np.asarray(x0, dtype=float) * 1.01, xl, xu)
+    fun(x)
+    return x
 
 
 def _solar_executable_path(runtime_dir):
@@ -106,6 +121,53 @@ class SolarPythonTests(unittest.TestCase):
         self.assertEqual(cubx.size, 5)
         self.assertFalse(any(math.isnan(float(value)) for value in cubx))
         self.assertEqual(solar_load("SOLAR10_MINCOST_UNCONSTRAINED").n, 5)
+
+    def test_featured_problem_initial_constraints_are_real(self):
+        # OptiProfiler evaluates the scoring truth at x0 while constructing a
+        # FeaturedProblem; it must see the simulated constraints, not NaN.
+        problem = solar_python_load("SOLAR1_MAXNRG_H1")
+        featured = FeaturedProblem(problem, Feature("plain"), 10)
+        self.assertTrue(math.isfinite(featured.maxcv_init))
+        self.assertEqual(featured.maxcv_init, problem.maxcv(problem.x0))
+        self.assertEqual(featured.fun_init, problem.fun(problem.x0))
+
+    def test_composed_feature_initial_constraints_are_real(self):
+        problem = solar_python_load("SOLAR6_MINCOST_TS")
+        featured = FeaturedProblem(problem, Feature("perturbed_x0+noisy"), 10, 3)
+        self.assertTrue(math.isfinite(featured.maxcv_init))
+        # perturbed_x0 and noisy keep the original coordinates.
+        self.assertEqual(featured.maxcv_init, problem.maxcv(featured.x0))
+
+    def test_one_simulation_serves_load_and_initial_values(self):
+        original = solar_python_tools._run_solar
+        with mock.patch.object(solar_python_tools, "_run_solar", side_effect=original) as run:
+            problem = solar_python_load("SOLAR1_MAXNRG_H1")
+            featured = FeaturedProblem(problem, Feature("plain"), 10)
+            featured.fun(featured.x0)
+            featured.cub(featured.x0)
+        self.assertEqual(run.call_count, 1)
+
+    def test_public_benchmark_assesses_every_constrained_problem(self):
+        from optiprofiler import benchmark
+
+        names = ["SOLAR1_MAXNRG_H1", "SOLAR6_MINCOST_TS"]
+        with tempfile.TemporaryDirectory(prefix="solar-benchmark-test-") as tmp:
+            report_path = Path(tmp) / "report.json"
+            benchmark(
+                [_stay_solver, _probe_solver],
+                plibs=["solar"], ptype="n", mindim=1, maxdim=10, maxb=100, maxcon=100,
+                problem_names=names, max_eval_factor=1, n_jobs=2,
+                draw_hist_plots="none", score_only=True, silent=True,
+                report_path=str(report_path), savepath=tmp,
+            )
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        problems = [p for p in report["problems"] if p["role"] == "primary"]
+        self.assertEqual(sorted(p["name"] for p in problems), sorted(names))
+        for problem in problems:
+            for run in problem["runs"]:
+                # A NaN initial violation is reported as {"value": null, ...}
+                # and makes the run unassessable by the convergence test.
+                self.assertIsInstance(run["constraint"]["initial"], (int, float))
 
     def test_integer_variables_are_projected_before_solar_call(self):
         problem = solar_python_load("SOLAR1_MAXNRG_H1")
