@@ -46,6 +46,8 @@ marks the commit tested with OptiProfiler 2.0.0. Until OptiProfiler 2.0.0 is on
 PyPI, install that core first from its own wheel or checkout, because pip cannot
 otherwise satisfy `optiprofiler>=2.0.0`. Do not work around this with
 `--no-deps`: it skips the compatibility check that the requirement expresses.
+pip keeps an installed adapter of the same version, so uninstall an earlier
+source build before installing another commit.
 
 ## Build Runtime
 
@@ -66,7 +68,8 @@ The first build holds an operating-system file lock in the cache, so parallel
 OptiProfiler workers do not compile the same runtime at the same time. The
 system releases that lock when its owner ends, so a killed build leaves no stale
 lock and the next process simply builds again. Waiting for a live build is
-bounded to 30 minutes and then fails with a clear error. Each build runs in its
+bounded to 30 minutes and then fails with a clear error, and the cache needs a
+file system with advisory locks. Each build runs in its
 own directory and the finished executable is moved into place atomically, so an
 interrupted build or a leftover compiler process cannot leave a partial
 executable. The cache directory name combines the upstream commit with a digest
@@ -121,8 +124,7 @@ filesystem path.
 
 ## Update and Uninstall
 
-For the unpublished development distribution, update the compatible feature
-branch and reinstall it explicitly:
+For a source checkout, update it and reinstall the adapter explicitly:
 
 ```bash
 git pull --ff-only

@@ -406,7 +406,15 @@ def _build_lock(cache_dir, timeout_sec=BUILD_TIMEOUT_SEC):
     cache_dir.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout_sec
     with (cache_dir / ".build.lock").open("a+b") as handle:
-        while not _try_lock_file(handle):
+        while True:
+            try:
+                if _try_lock_file(handle):
+                    break
+            except OSError as exc:
+                raise SolarExecutionError(
+                    f"Cannot lock {cache_dir} to build SOLAR. Point SOLAR_CACHE_DIR "
+                    "to a local file system, or SOLAR_EXECUTABLE to a built binary."
+                ) from exc
             if time.monotonic() >= deadline:
                 raise SolarExecutionError(
                     f"Timed out after {timeout_sec:g} s waiting for another "

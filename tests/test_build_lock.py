@@ -101,6 +101,12 @@ class BuildTests(unittest.TestCase):
         with tools._build_lock(self.cache, timeout_sec=5):
             pass
 
+    def test_file_system_without_locks_gives_a_clear_error(self):
+        with mock.patch.object(tools, '_try_lock_file', side_effect=OSError('no locks')):
+            with self.assertRaisesRegex(tools.SolarExecutionError, 'local file system'):
+                with tools._build_lock(self.cache, timeout_sec=1):
+                    self.fail('The lock was not held.')
+
     def test_lock_is_released_after_a_failure(self):
         with self.assertRaises(ArithmeticError):
             with tools._build_lock(self.cache, timeout_sec=1):

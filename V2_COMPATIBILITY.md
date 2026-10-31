@@ -2,7 +2,7 @@
 
 This line is the reviewed SOLAR adapter for OptiProfiler 2.0.0. Provider API
 version remains **1**. Upstream problem definitions, selection metadata and the
-automatic upstream-promotion policy are unchanged.
+manual review of upstream updates are unchanged.
 
 The adapter supplies selection and public Problem callbacks. Ordered feature
 composition, counters and histories, scores, save/load, and eval_report/2 are
