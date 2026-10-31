@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import contextmanager
 import csv
+from functools import lru_cache
+import hashlib
 import json
 import math
 import os
@@ -20,6 +22,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 RUNTIME_DIR = CURRENT_DIR / "runtime" / "solar"
 METADATA_PATH = RUNTIME_DIR / "metadata" / "problems.json"
 PROBINFO_PATH = RUNTIME_DIR / "metadata" / "probinfo.csv"
+BUILD_TIMEOUT_SEC = 1800.0
 
 
 class SolarExecutionError(RuntimeError):
@@ -292,24 +295,52 @@ def _ensure_executable():
     with _build_lock(cache_dir):
         if executable.exists():
             return executable
-        source_dir = cache_dir / "src"
-        shutil.rmtree(source_dir, ignore_errors=True)
-        shutil.copytree(RUNTIME_DIR / "src", source_dir)
-        executable.parent.mkdir(parents=True, exist_ok=True)
-        completed = subprocess.run(
-            _make_command(source_dir),
-            check=False,
-            capture_output=True,
-            text=True,
+        _build_executable(cache_dir, executable)
+    return executable
+
+
+def _build_executable(cache_dir, executable):
+    """Compile in a private tree and publish the executable atomically.
+
+    The lock is free again as soon as a killed builder dies, but its compiler
+    can outlive it. A private tree keeps such an orphan away from the new
+    build, and the atomic replace never exposes a partially linked binary.
+    Trees left by killed builders are no longer in use once the lock is held.
+    """
+
+    for leftover in cache_dir.glob(".build-*"):
+        shutil.rmtree(leftover, ignore_errors=True)
+    build_dir = Path(tempfile.mkdtemp(prefix=".build-", dir=cache_dir))
+    try:
+        source_dir = build_dir / "src"
+        shutil.copytree(
+            RUNTIME_DIR / "src", source_dir, ignore=shutil.ignore_patterns("*.o")
         )
+        (build_dir / "bin").mkdir()
+        try:
+            completed = subprocess.run(
+                _make_command(source_dir),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=BUILD_TIMEOUT_SEC,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise SolarExecutionError(
+                f"Timed out after {BUILD_TIMEOUT_SEC:g} s building SOLAR"
+            ) from exc
         if completed.returncode != 0:
             raise SolarExecutionError(
                 "Failed to build SOLAR executable: "
                 f"{completed.stdout}{completed.stderr}"
             )
-    if not executable.exists():
-        raise SolarExecutionError(f"SOLAR executable was not built: {executable}")
-    return executable
+        built = build_dir / "bin" / executable.name
+        if not built.is_file():
+            raise SolarExecutionError(f"SOLAR executable was not built: {built}")
+        executable.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(built, executable)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=True)
 
 
 def _default_executable():
@@ -329,12 +360,29 @@ def _runtime_cache_dir():
             os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")
         ).expanduser() / "optiprofiler" / "solar"
 
+    return cache_root.resolve() / _runtime_cache_key()
+
+
+@lru_cache(maxsize=1)
+def _runtime_cache_key():
+    """Name the cache by upstream commit and by the exact packaged sources.
+
+    The commit alone would reuse an executable built from different sources
+    after a local patch to the runtime.
+    """
+
     try:
         with (RUNTIME_DIR / "manifest.json").open(encoding="utf-8") as handle:
-            cache_key = json.load(handle)["upstream"]["commit"][:12]
+            commit = json.load(handle)["upstream"]["commit"][:12]
     except (FileNotFoundError, KeyError, TypeError, ValueError):
-        cache_key = "unversioned"
-    return cache_root.resolve() / cache_key
+        commit = "unversioned"
+    digest = hashlib.sha256()
+    for path in sorted((RUNTIME_DIR / "src").iterdir(), key=lambda item: item.name):
+        if path.name == "makefile" or path.suffix in {".cpp", ".hpp"}:
+            content = path.read_bytes()
+            digest.update(f"{path.name}\0{len(content)}\0".encode("utf-8"))
+            digest.update(content)
+    return f"{commit}-{digest.hexdigest()[:12]}"
 
 
 def _make_command(source_dir):
@@ -346,30 +394,58 @@ def _make_command(source_dir):
 
 
 @contextmanager
-def _build_lock(cache_dir, timeout_sec=600.0):
-    lock_path = cache_dir / ".build.lock.d"
+def _build_lock(cache_dir, timeout_sec=BUILD_TIMEOUT_SEC):
+    """Serialize first builds with an operating-system file lock.
+
+    The lock belongs to the open file, so the kernel releases it when its owner
+    dies, however abruptly. A killed build cannot leave a stale lock, and there
+    is no age or PID guess that could steal the lock of a live build. The wait
+    for a live build is bounded by ``timeout_sec``.
+    """
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout_sec
-    acquired = False
-    while True:
-        try:
-            lock_path.mkdir()
-            acquired = True
-            break
-        except FileExistsError as exc:
+    with (cache_dir / ".build.lock").open("a+b") as handle:
+        while not _try_lock_file(handle):
             if time.monotonic() >= deadline:
                 raise SolarExecutionError(
-                    "Timed out waiting for another process to build SOLAR"
-                ) from exc
+                    f"Timed out after {timeout_sec:g} s waiting for another "
+                    f"process to build SOLAR in {cache_dir}"
+                )
             time.sleep(0.1)
+        try:
+            yield
+        finally:
+            _unlock_file(handle)
+
+
+def _try_lock_file(handle):
     try:
-        yield
-    finally:
-        if acquired:
-            try:
-                lock_path.rmdir()
-            except OSError:
-                pass
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (BlockingIOError, PermissionError):
+        # POSIX reports a held lock as EWOULDBLOCK, Windows as EACCES.
+        return False
+    return True
+
+
+def _unlock_file(handle):
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def _run_solar(executable, problem_id, x, n_objectives, n_constraints, timeout_sec=300.0):
