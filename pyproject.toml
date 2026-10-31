@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.17.0",
-    "optiprofiler>=1.4.0",
+    "optiprofiler>=2.0.0",
 ]
 version = "0.1.0"
 
@@ -45,6 +45,7 @@ include-package-data = false
 optiprofiler_solar = [
     "LICENSE",
     "README.md",
+    "V2_COMPATIBILITY.md",
     "THIRD_PARTY_NOTICES.md",
     "licenses/GPL-3.0.txt",
     "licenses/LGPL-3.0.txt",

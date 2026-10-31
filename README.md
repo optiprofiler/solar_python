@@ -1,5 +1,7 @@
 # SOLAR Python Adapter
 
+**OptiProfiler 2.0:** See [compatibility and release boundaries](V2_COMPATIBILITY.md).
+
 Python OptiProfiler wrapper for the SOLAR black-box optimization benchmark.
 
 This repository carries a slim SOLAR runtime under `runtime/solar/`. It keeps
@@ -13,10 +15,9 @@ license, and provenance files; do not commit upstream `.git`, upstream `tests/`,
 
 ## Package and Plugin
 
-This package definition is a development build for the API-v1 protocol. The
-corresponding OptiProfiler release and this plugin distribution have not been
-published yet. Until that release exists, test from checkouts with `--no-deps`
-as shown below; the `0.1.0` package value is build metadata, not a release
+This adapter uses API-v1 and requires `optiprofiler>=2.0.0`. OptiProfiler
+2.0.0 is not on PyPI until it is released, and this plugin is not published on
+PyPI either. The `0.1.0` package value is build metadata, not a release
 announcement.
 
 The Python distribution name is `optiprofiler-solar`. It installs the adapter
@@ -32,12 +33,19 @@ uses an empty options mapping: `benchmark(..., plib_options={"solar": {}})` is
 valid, while nonempty SOLAR-specific options are rejected by OptiProfiler before
 the benchmark starts.
 
-For local development against a checked-out OptiProfiler core:
+Install the adapter at the exact commit recorded in the core's
+`problem_libraries.lock`, using normal dependency resolution:
 
 ```bash
-python -m pip install -e /path/to/optiprofiler
-python -m pip install -e . --no-deps --no-build-isolation
+python -m pip install "optiprofiler-solar @ git+https://github.com/optiprofiler/solar_python@<sha>"
+python -m pip check
 ```
+
+Replace `<sha>` with the full commit from the lock. The tag `optiprofiler-2.0.0`
+marks the commit tested with OptiProfiler 2.0.0. Until OptiProfiler 2.0.0 is on
+PyPI, install that core first from its own wheel or checkout, because pip cannot
+otherwise satisfy `optiprofiler>=2.0.0`. Do not work around this with
+`--no-deps`: it skips the compatibility check that the requirement expresses.
 
 ## Build Runtime
 
@@ -52,9 +60,17 @@ uses a source-checkout binary when present. Otherwise, including after a wheel
 installation, it copies the packaged source to a versioned user cache and
 builds there; it never writes generated files into `site-packages`. Set
 `SOLAR_CACHE_DIR` to choose the cache root or `SOLAR_EXECUTABLE` to use an
-existing binary. First build is protected by a local directory lock, so
-parallel OptiProfiler workers do not compile and link the same runtime at the
-same time.
+existing binary.
+
+The first build holds an operating-system file lock in the cache, so parallel
+OptiProfiler workers do not compile the same runtime at the same time. The
+system releases that lock when its owner ends, so a killed build leaves no stale
+lock and the next process simply builds again. Waiting for a live build is
+bounded to 30 minutes and then fails with a clear error. Each build runs in its
+own directory and the finished executable is moved into place atomically, so an
+interrupted build or a leftover compiler process cannot leave a partial
+executable. The cache directory name combines the upstream commit with a digest
+of the packaged sources, so a locally patched runtime gets its own executable.
 
 The build requires `make` and a C++ compiler compatible with upstream SOLAR.
 On Linux and macOS this is usually the system `make` plus `g++`/Clang. On
@@ -110,13 +126,13 @@ branch and reinstall it explicitly:
 
 ```bash
 git pull --ff-only
-python -m pip install -e . --no-deps --no-build-isolation
+python -m pip install -e .
 ```
 
 The OptiProfiler core repository records its tested adapter commit in
 `problem_libraries.lock`. Updating the adapter source and updating the compiled
 runtime cache are separate operations: the wrapper selects a versioned cache
-directory from the packaged runtime manifest and rebuilds there when needed.
+directory from the packaged runtime and rebuilds there when needed.
 
 Remove the adapter distribution with:
 
@@ -126,7 +142,7 @@ python -m pip uninstall optiprofiler-solar
 
 This removes the adapter, entry point, and the slim runtime source installed
 inside that distribution. It preserves `SOLAR_CACHE_DIR`, the default
-`~/.cache/optiprofiler/solar/<commit>` cache, any executable selected through
+`~/.cache/optiprofiler/solar/<commit>-<source digest>` cache, any executable selected through
 `SOLAR_EXECUTABLE`, and user benchmark output. Removing the OptiProfiler core
 also leaves this independently installed adapter and its cache in place; the
 adapter becomes usable again after a compatible core is installed.
