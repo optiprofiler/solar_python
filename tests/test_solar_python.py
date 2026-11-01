@@ -150,8 +150,13 @@ class SolarPythonTests(unittest.TestCase):
     def test_public_benchmark_assesses_every_constrained_problem(self):
         from optiprofiler import benchmark
 
+        # A local build leaves an .egg-info in the checkout, and Python < 3.10 then
+        # lists the installed provider twice, which the core refuses as a conflict.
+        checkout = Path(__file__).resolve().parents[1]
+        search_path = [entry for entry in sys.path if Path(entry or ".").resolve() != checkout]
         names = ["SOLAR1_MAXNRG_H1", "SOLAR6_MINCOST_TS"]
-        with tempfile.TemporaryDirectory(prefix="solar-benchmark-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="solar-benchmark-test-") as tmp, \
+                mock.patch.object(sys, "path", search_path):
             report_path = Path(tmp) / "report.json"
             benchmark(
                 [_stay_solver, _probe_solver],
