@@ -10,6 +10,8 @@ jobs:
     name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      OP_TEST_V2: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -25,17 +27,8 @@ jobs:
         with:
           repository: optiprofiler/optiprofiler
           path: optiprofiler
-          ref: main
-
-      - name: Bootstrap the API-v1 protocol under development
-        shell: bash
-        run: |
-          protocol_file="optiprofiler/python/optiprofiler/problem_libraries.py"
-          if ! test -f "$protocol_file" || ! grep -q "class ProblemLibraryPlugin" "$protocol_file"; then
-            git -C optiprofiler fetch --depth=1 origin python
-            git -C optiprofiler checkout --detach FETCH_HEAD
-          fi
-          grep -q "PROBLEM_LIBRARY_API_VERSION = 1" "$protocol_file"
+          # The exact 2.0.0 core this provider release was accepted with.
+          ref: ec130fb4e2fd7e59204bc4696d36b30eb2fa9da3
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -62,7 +55,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install build "setuptools>=61" wheel
           python -m pip install -e optiprofiler
-          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pip install -e . --no-build-isolation
 
       - name: Build SOLAR runtime
         shell: bash
@@ -99,7 +92,7 @@ jobs:
         run: |
           wheel="$(python -c 'from pathlib import Path; print(next(Path("dist").glob("*.whl")).resolve())')"
           python -m pip uninstall -y optiprofiler-solar
-          python -m pip install --no-deps "$wheel"
+          python -m pip install "$wheel"
           tmpdir="$(mktemp -d)"
           cd "$tmpdir"
           python - <<'PY'
