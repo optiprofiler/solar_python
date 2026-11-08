@@ -27,7 +27,7 @@ jobs:
           repository: optiprofiler/optiprofiler
           path: optiprofiler
           # The exact 2.0.0 core this provider release was accepted with.
-          ref: ec130fb4e2fd7e59204bc4696d36b30eb2fa9da3
+          ref: 2af109cef8c568a0bdf5aa24528c5d4d8711141f
 
       - uses: actions/setup-python@v5
         with:
